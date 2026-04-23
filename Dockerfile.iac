@@ -1,0 +1,19 @@
+# Жорстко зафіксована версія Python
+FROM python:3.10.12-slim
+
+# Жорстко зафіксовані версії Terraform та tflocal
+ENV TERRAFORM_VERSION=1.5.7
+ENV TFLOCAL_VERSION=0.18.2
+
+RUN apt-get update && apt-get install -y wget unzip curl awscli && rm -rf /var/lib/apt/lists/*
+
+# Встановлення Terraform
+RUN wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip \
+  && unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/ \
+  && rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+
+# Встановлення tflocal
+RUN pip install --no-cache-dir terraform-local==${TFLOCAL_VERSION}
+
+WORKDIR /workspace
+CMD ["sh", "-c", "terraform --version && python --version && tflocal --version"]

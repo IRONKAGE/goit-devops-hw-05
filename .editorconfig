@@ -1,0 +1,64 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# Це головний файл (не шукати конфіги вище по дереву папок)
+root = true
+
+# Загальні правила для ВСІХ файлів
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# =========================
+# Terraform / HCL
+# =========================
+# Стандарт Terraform: 2 пробіли
+[*.{tf,tfvars,hcl}]
+indent_style = space
+indent_size = 2
+
+# =========================
+# YAML & JSON (Docker Compose, тощо)
+# =========================
+[*.{yml,yaml,json}]
+indent_style = space
+indent_size = 2
+
+# =========================
+# Shell Scripts
+# =========================
+# КРИТИЧНО: Тільки LF, інакше скрипти зламаються в Docker/Linux
+[*.sh]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+
+# Windows Batch/CMD скрипти
+[*.cmd]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+
+# =========================
+# Markdown (README)
+# =========================
+# Дозволяємо пробіли в кінці рядка (в Markdown 2 пробіли = перенесення рядка)
+[*.md]
+trim_trailing_whitespace = false
+
+# =========================
+# Makefile
+# =========================
+# КРИТИЧНО: Makefile розуміє ТІЛЬКИ табуляцію (Tabs) для відступів перед командами.
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+# =========================
+# Docker
+# =========================
+# Застосовується до Dockerfile, Dockerfile.iac тощо
+[Dockerfile*]
+indent_style = space
+indent_size = 4

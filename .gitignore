@@ -1,0 +1,60 @@
+# =========================
+# Terraform
+# =========================
+# Локальні директорії Terraform
+**/.terraform/*
+
+# Файли стейту (КРИТИЧНО ВАЖЛИВО НЕ КОМІТИТИ!)
+*.tfstate
+*.tfstate.*
+
+# Файли зі змінними та секретами
+.env
+*.tfvars
+*.auto.tfvars
+*.tfvars.json
+
+# Файли краш-логів
+crash.log
+crash.*.log
+
+# Файли перевизначення
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI конфіг
+.terraformrc
+terraform.rc
+
+# Примітка: .terraform.lock.hcl ЗАЗВИЧАЙ комітять,
+# щоб фіксувати версії провайдерів для всієї команди,
+# тому ми його НЕ ігноруємо.
+
+# =========================
+# Docker & LocalStack
+# =========================
+# Якщо LocalStack створить локальні папки для томів
+.localstack/
+localstack_data/
+localstack-vol/
+volume/
+
+# =========================
+# OS & IDE Files
+# =========================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDEs (VS Code, IntelliJ)
+.vscode/
+.idea/
+*.swp
