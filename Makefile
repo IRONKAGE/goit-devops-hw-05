@@ -4,13 +4,17 @@
 
 # 0. Кросплатформна підтримка (ОС та Docker)
 ifeq ($(OS),Windows_NT)
-  TF_WRAPPER := tf.cmd
-  DOCKER_START_CMD := start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-  WAIT_DOCKER := powershell -Command "do { Write-Host 'Чекаю на Docker...'; Start-Sleep -Seconds 2 } while (!(docker info 2>$$null))"
+	TF_WRAPPER := tf.cmd
+	DOCKER_START_CMD := start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+	WAIT_DOCKER := powershell -Command "do { Write-Host 'Чекаю на Docker...'; Start-Sleep -Seconds 2 } while (!(docker info 2>$$null))"
+	UNCOMMENT_CMD := powershell -Command "(Get-Content backend.tf) -replace '^# ?', '' | Set-Content backend.tf"
+	COMMENT_CMD := powershell -Command "(Get-Content backend.tf) | ForEach-Object { if ($$_ -notmatch '^#') { '# ' + $$_ } else { $$_ } } | Set-Content backend.tf"
 else
-  TF_WRAPPER := ./tf.sh
-  DOCKER_START_CMD := open -a Docker
-  WAIT_DOCKER := until docker info >/dev/null 2>&1; do echo "Чекаю на Docker..."; sleep 3; done
+	TF_WRAPPER := ./tf.sh
+	DOCKER_START_CMD := open -a Docker
+	WAIT_DOCKER := until docker info >/dev/null 2>&1; do echo "Чекаю на Docker..."; sleep 3; done
+	UNCOMMENT_CMD := sed -i.bak 's/^# *//' backend.tf && rm -f backend.tf.bak
+	COMMENT_CMD := sed -i.bak '/^#/! s/^/# /' backend.tf && rm -f backend.tf.bak
 endif
 
 # 1. Налаштування середовищ та цілей
@@ -27,12 +31,12 @@ ARG3 := $(word 3, $(MAKECMDGOALS))
 
 # 3. Логіка середовища
 ifeq ($(CMD),test)
-  # Для команди test: make test [target] [env]
-  TARGET := $(if $(ARG2),$(ARG2),$(DEFAULT_TARGET))
-  ENV := $(if $(ARG3),$(ARG3),$(DEFAULT_ENV))
+	# Для команди test: make test [target] [env]
+	TARGET := $(if $(ARG2),$(ARG2),$(DEFAULT_TARGET))
+	ENV := $(if $(ARG3),$(ARG3),$(DEFAULT_ENV))
 else
-  # Для інших команд (deploy): make deploy-local [env]
-  ENV := $(if $(ARG2),$(ARG2),$(DEFAULT_ENV))
+	# Для інших команд (deploy): make deploy-local [env]
+	ENV := $(if $(ARG2),$(ARG2),$(DEFAULT_ENV))
 endif
 
 ENV_FILE := $(ENV).tfvars
@@ -40,24 +44,24 @@ ENV_FILE := $(ENV).tfvars
 # 4. Валідація
 # Перевірка для команд деплою та видалення
 ifneq ($(filter deploy-local deploy-aws destroy-local destroy-aws, $(CMD)),)
-  ifeq ($(filter $(ENV), $(VALID_ENVS)),)
-    $(error [ПОМИЛКА] Невідоме середовище '$(ENV)'. Доступні середовища: $(VALID_ENVS))
-  endif
+	ifeq ($(filter $(ENV), $(VALID_ENVS)),)
+		$(error [ПОМИЛКА] Невідоме середовище '$(ENV)'. Доступні середовища: $(VALID_ENVS))
+	endif
 endif
 
 # Перевірка для команди test
 ifeq ($(CMD),test)
-  ifeq ($(filter $(TARGET), $(VALID_TARGETS)),)
-    $(error [ПОМИЛКА] Невідома ціль '$(TARGET)'. Доступні цілі: $(VALID_TARGETS))
-  endif
-  ifeq ($(filter $(ENV), $(VALID_ENVS)),)
-    $(error [ПОМИЛКА] Невідоме середовище '$(ENV)'. Доступні середовища: $(VALID_ENVS))
-  endif
+	ifeq ($(filter $(TARGET), $(VALID_TARGETS)),)
+		$(error [ПОМИЛКА] Невідома ціль '$(TARGET)'. Доступні цілі: $(VALID_TARGETS))
+	endif
+	ifeq ($(filter $(ENV), $(VALID_ENVS)),)
+		$(error [ПОМИЛКА] Невідоме середовище '$(ENV)'. Доступні середовища: $(VALID_ENVS))
+	endif
 endif
 
 # За замовчуванням, якщо написати просто `make`, викличеться help
 .DEFAULT_GOAL := help
-.PHONY: help up down deploy-local deploy-aws destroy-local clean deep-clean test docker-ensure
+.PHONY: help up down deploy-local deploy-aws destroy-local destroy-aws clean deep-clean test docker-ensure backend-init backend-local
 
 # ==============================================================================
 # АВТОМАТИЗАЦІЯ СЕРЕДОВИЩА
@@ -106,18 +110,27 @@ deploy-local: up
 	$(TF_WRAPPER) tflocal init
 	$(TF_WRAPPER) tflocal apply -var-file=$(ENV_FILE) -auto-approve
 
-deploy-aws:
-	@echo "[*] Запуск бойового деплою (AWS) для середовища: $(ENV)..."
-	$(TF_WRAPPER) terraform init -migrate-state
-	$(TF_WRAPPER) terraform apply -var-file=$(ENV_FILE)
+deploy-aws: docker-ensure
+	@echo "[*] Запуск бойового РОЗУМНОГО деплою (AWS) для середовища: $(ENV)..."
+	@chmod +x smart-deploy.sh
+	$(TF_WRAPPER) sh ./smart-deploy.sh $(ENV_FILE)
 
 destroy-local: up
 	@echo "[*] Видалення локальних ресурсів для середовища: $(ENV)..."
 	$(TF_WRAPPER) tflocal destroy -var-file=$(ENV_FILE) -auto-approve
 
-destroy-aws:
-	@echo "⚠️ [УВАГА] Ви збираєтесь видалити РЕАЛЬНІ ресурси AWS для середовища: $(ENV)!"
-	$(TF_WRAPPER) terraform destroy -var-file=$(ENV_FILE)
+# Замінили 'up' на 'docker-ensure'
+destroy-aws: docker-ensure
+	@echo "⚠️ [УВАГА] Евакуація стейту з хмари перед видаленням..."
+ifeq ($(OS),Windows_NT)
+	@powershell -Command "(Get-Content backend.tf) | ForEach-Object { if ($$_ -notmatch '^#') { '# ' + $$_ } else { $$_ } } | Set-Content backend.tf"
+else
+	@sed -i.bak '/^#/! s/^/# /' backend.tf && rm -f backend.tf.bak
+endif
+	$(TF_WRAPPER) terraform init -migrate-state -force-copy
+	@echo "⚠️ [УВАГА] Видалення РЕАЛЬНИХ ресурсів AWS для середовища: $(ENV)!"
+	helm uninstall $(APP_NAME) || true
+	$(TF_WRAPPER) terraform destroy -var-file=$(ENV_FILE) -auto-approve
 
 test: docker-ensure
 	@echo "[*] Запуск комплексного тестування..."
